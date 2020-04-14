@@ -1,0 +1,1357 @@
+﻿openapi: 3.0.1
+info:
+  title: Landmark Order Service
+  version: 1.0.0-draft
+  description: Description of the new Landmark Order Service
+servers:
+  - url: 'https://bvt-api.landmarkcloudservices.com/order'
+  - url: 'https://uat-api.landmarkcloudservices.com/order'
+  - url: 'https://api.landmarkcloudservices.com/order'
+tags:
+  - name: Admin
+  - name: Order Service
+paths:
+
+  /config/callback:
+    post:
+      tags:
+        - Admin
+      description: "Use this endpoint to set you callback configuration at a Account Level
+      <p>When deciding how to callback we follow this order of preference:
+      <ul>
+      <li>Account</li>
+      <li>Order</li>
+      </ul>
+      Where the most specific level is honored, for example: if I have configured Account level callbacks and supply a 
+      callback in the Order then the Order level callback will be applied.
+      </p>
+      "
+      operationId: order:config:callback:update
+      summary: order:config:callback:update
+      parameters: []
+      requestBody: 
+        content:
+          application/json: 
+            schema:
+              $ref: '#/components/schemas/UpdateCallback'
+            examples:
+              Update Account Callback - OAuth2:
+                $ref: '#/components/examples/AdminCallbackOAuth2'
+              Update Account Callback - API Key:
+                $ref: '#/components/examples/AdminCallbackAPIKey'
+              Update Account Callback - Basic Auth:
+                $ref: '#/components/examples/AdminCallbackBasicAuth'
+              Update Account Callback - Other:
+                $ref: '#/components/examples/AdminCallbackOther'
+                
+
+      responses: 
+        '200':
+          $ref: '#/components/responses/Default'
+        '401':
+          $ref: '#/components/responses/Unauthorized'   
+        '404':
+          $ref: '#/components/responses/NotFound' 
+  
+  /:
+    post:
+      tags:
+        - Order Service
+      description: "Creates a new Order. We support 4 types of Order Request:
+      <p>
+      <ul>
+      <li><b>OrderByGeometry</b> - We use the supplied geometries as is and generate a plan from these as and when required</li>
+      <li><b>OrderByPlan</b> - You can submit your own plan image and we will create the geometries to match this plan. 
+      <b>Note:</b> - this requires manual intervention and so products that would normally return in a few minutes may take 
+      several hours to return. Please refer to as SLA's for details </li>
+      <li><b>OrderByTitleNumber</b> - We lookup the geometries for the title number you supply and generate a plan for the products 
+      that require it</li>
+      <li><b>NonPropertyRelated</b> - for AML's and other non property related products</li>
+      </ul>
+      <p/>
+      <p>
+      When you submit an order to this endpoint you will either receive a 202 response that acknowledges that your order has 
+      been received and has passed some basic schema validation. This response includes any order/orderItem numbers and an 
+      operation ID, please see the schema below. 
+      You will receive via the supplied callback URL or your configured callback URL life cycle notifications about this 
+      order and its order items. Please refer to the Notification documentation.
+      </p>
+      "
+      summary: order:create
+      operationId: order:create
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/OrderByGeometryRequest'
+                - $ref: '#/components/schemas/OrderByPlanRequest'
+                - $ref: '#/components/schemas/OrderByTitleNumberRequest'
+                - $ref: '#/components/schemas/OrderNonPropertyRelatedRequest'
+                - $ref: '#/components/schemas/OrderByAddressRequest'
+            examples:
+              Example 1 - Order With Geometries (Callback - No Auth):
+                $ref: '#/components/examples/OrderRequestWithGeometries'
+              Example 2 - Order With Title Number (Callback - API Key Auth): 
+                  $ref: '#/components/examples/OrderRequestWithTitleNumber'
+              Example 3 - Order With Plan Image (Callback - OAuth2): 
+                $ref: '#/components/examples/OrderRequestWithPlan'
+              Example 4 - Order With Geometries and TransactionId (Callback - Basic Auth):
+                $ref: '#/components/examples/OrderRequestWithGeometriesTrans'
+              Example 5 - Order With Title Number (Alternative Delivery - Email):
+                $ref: '#/components/examples/OrderRequestWithTitleNumberEmailDelivery'
+              Example 6 - Order With Address:
+                $ref: '#/components/examples/OrderRequestWithAddress'
+
+      callbacks:
+        OrderNotification:
+          '{$request.body#/callback/callbackUrl}':
+            post:
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/OrderNotification'
+                    examples:
+                      Order Failed Validation Notification:
+                        $ref: '#/components/examples/OrderFailedValidationNotification'
+                      Order Item Result Notification:
+                        $ref: '#/components/examples/OrderItemResultNotification'
+                      
+              responses:
+                '200':
+                  description: Your server returns this code if it accepts the callback
+            
+
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailsResponse'
+              examples:
+                Order Response Example: 
+                  $ref: '#/components/examples/OrderResponseExample'
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'   
+        '404':
+          $ref: '#/components/responses/NotFound' 
+  
+  '/{orderId}':
+    get:
+      tags:
+        - Order Service
+      description: Gets the Order Details
+      summary: order:read
+      operationId: order:read
+      parameters:
+        - name: orderId
+          in: path
+          description: The orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailsResponse'
+              examples:
+                Order Detail Response:
+                  value:
+                    info:
+                      operationId: 6aa6e8d7-9684-403d-ae9f-14ca96fe1cbb
+                    data:
+                      orderId: 130d6efc-c608-4d6d-a7e6-d4cbaee84f4c
+                      transactionId: 2d1a8010-7fc8-4a76-9880-09df30f56c25
+                      orderStatus: Processing
+                      orderStatusDescription: Your order is being processed
+                      clientRef: CLIENT/123/123/B
+                      orderedFor: 68bc8ce1-c7bd-4260-bd8d-9d665655f65b
+                      geometries: 
+                      - type: property,
+                        geometry: POLYGON((576906.35 157032.45,576907.2 157031.6,576907.4 157030.85,576906.35 157032.45))
+                      address:
+                        uprn: 10013040688
+                        organisationName: Landmark Information Group Ltd
+                        subBuildingName: Unit 5-8
+                        buildingName: Abbey Court
+                        thoroughfare: Eagle Way
+                        dependentLocality: Sowton Industrial Estate
+                        postTown: EXETER
+                        postcode: EX2 7HY
+                        country: E
+                      orderItems:
+                        - orderItemId: 856c4e2c-fe53-444a-8537-a9fcb0f631cb
+                          createdDate: '2020-01-31T12:00:00Z'
+                          expectedDate: '2020-01-31T13:00:00Z'
+                          orderItemStatus: Complete
+                          orderItemStatusDescription: Order Complete
+                          metaData:
+                            status: NON COMPLIANT
+                          product:
+                            productId: LMKRVR
+                            productName: RiskView Residential
+                            supplier: Landmark
+                          price:
+                            netPrice: 4000
+                            grossPrice: 4800
+                            vat: 800
+                          results:
+                            - documentId: de457f6d-f170-48c6-bf86-dd313aca36ba
+                              mimeType: application/pdf 
+                              documentType: RVR
+                              links:
+                                self: 'https://api.landmarkcloud.io/document/de457f6d-f170-48c6-bf86-dd313aca36ba/details'
+                                download: 'https://api.landmarkcloud.io/document/de457f6d-f170-48c6-bf86-dd313aca36ba'
+                        - orderItemId: 8a6e3b50-df03-4e0d-80d2-19a9f4763961
+                          createdDate: '2020-01-31T12:00:00Z'
+                          expectedDate: '2020-02-15T13:00:00Z'
+                          orderItemStatus: Processing
+                          orderItemStatusDescription: Order Item is being processed
+                          metaData: {}
+                          product:
+                            productId: CON29
+                            productName: Official Local Authority Search
+                            supplier: Medway County Council
+                          price:
+                            netPrice: 12800
+                            grossPrice: 15360
+                            vat: 2560
+                          results:
+                            - documentId: ddc74205-10d4-43f2-83ec-ef055945f732
+                              mimeType: application/pdf 
+                              documentType: RVR
+                              links:
+                                self: 'https://api.landmarkcloud.io/document/ddc74205-10d4-43f2-83ec-ef055945f732/details'
+                                download: 'https://api.landmarkcloud.io/document/ddc74205-10d4-43f2-83ec-ef055945f732'
+
+        '401':
+          $ref: '#/components/responses/Unauthorized'   
+        '404':
+          $ref: '#/components/responses/NotFound' 
+
+  '/{orderId}/plan':
+    get:
+      tags:
+        - Order Service
+      description: Get plan for orderId
+      summary: order:plan:read
+      operationId: order:plan:read
+      parameters:
+        - name: orderId
+          in: path
+          description: The orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Return the Plan Image
+          content:
+            image/png: {}
+            application/pdf: {}
+        '401':
+          $ref: '#/components/responses/Unauthorized'   
+        '404':
+          $ref: '#/components/responses/NotFound' 
+
+  '/{orderId}/status':
+    get:
+      tags:
+        - Order Service
+      description: Get the status of each item in the order
+      summary: order:status:read
+      operationId: order:status:read
+      parameters:
+        - name: orderId
+          in: path
+          description: The ID order of the order
+          required: true
+          schema:
+            type: string
+      responses:
+        '200': 
+          $ref: '#/components/responses/OrderStatusResponse'    
+        '401':
+          $ref: '#/components/responses/Unauthorized'   
+        '404':
+          $ref: '#/components/responses/NotFound' 
+
+  '/{orderId}/orderItem':
+    post:
+      tags:
+        - Order Service
+      description: Add orderItem to order
+      summary: order:orderitem:create
+      operationId: order:orderitem:create
+      parameters:
+        - name: orderId
+          in: path
+          description: The orderId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product: 
+                  $ref: '#/components/schemas/Product'
+            examples:
+              Add OrderItem Examples:
+                $ref: '#/components/examples/AddOrderLineRequest'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderLineResponse'
+              examples:
+                Example 1 - RiskView Residential:
+                  $ref: '#/components/examples/AddOrderLineResponse'
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'   
+        '404':
+          $ref: '#/components/responses/NotFound' 
+
+  '/{orderId}/orderItem/{orderItemId}':
+    get:
+      tags:
+        - Order Service
+      description: Get Order Item details
+      summary: order:orderitem:read
+      operationId: order:orderitem:read
+      parameters:
+        - name: orderId
+          in: path
+          description: The orderId
+          required: true
+          schema:
+            type: string
+        - name: orderItemId
+          in: path
+          description: The orderItemId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 200 OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderLineResponse'
+              examples:
+                Example 1 - RiskView Residential:
+                  value:
+                    info:
+                      operationId: 6aa6e8d7-9684-403d-ae9f-14ca96fe1cbb
+                    data:
+                      orderItemId: 856c4e2c-fe53-444a-8537-a9fcb0f631cb
+                      product:
+                        productId: LMKRVR
+                        productName: RiskView Residential
+                        supplier: Landmark
+                      createdDate: '2020-01-31T12:00:00Z'
+                      expectedDate: '2020-01-31T13:00:00Z'
+                      orderItemStatus: Complete
+                      orderItemStatusDescription: Results are now available
+                      metaData:
+                        status: NON COMPLIANT
+                      price:
+                        netPrice: 4000
+                        grossPrice: 4800
+                        vat: 800
+                      results:
+                        - documentId: de457f6d-f170-48c6-bf86-dd313aca36ba
+                          mimeType: application/pdf 
+                          documentType: RVR
+                          links:
+                            self: 'https://api.landmarkcloud.io/document/de457f6d-f170-48c6-bf86-dd313aca36ba/details'
+                            download: 'https://api.landmarkcloud.io/document/de457f6d-f170-48c6-bf86-dd313aca36ba'
+
+                Example 2 - Official Local Authority:
+                  value:
+                    info:
+                      operationId: 6aa6e8d7-9684-403d-ae9f-14ca96fe1cbb
+                    data:
+                      orderItemId: 8a6e3b50-df03-4e0d-80d2-19a9f4763961
+                      product:
+                        productId: CON29
+                        productName: Official Local Authority Search
+                        supplier: Medway County Council
+                      createdDate: '2020-01-31T12:00:00Z'
+                      expectedDate: '2020-02-15T13:00:00Z'
+                      orderItemStatus: Processing
+                      orderItemStatusDescription: Order Item is being processed
+                      metaData: {}
+                      price:
+                        netPrice: 12800
+                        grossPrice: 15360
+                        vat: 2560
+                      results:
+                        - documentId: ddc74205-10d4-43f2-83ec-ef055945f732
+                          mimeType: application/pdf 
+                          documentType: RVR
+                          links:
+                            self: 'https://api.landmarkcloud.io/document/ddc74205-10d4-43f2-83ec-ef055945f732/details'
+                            download: 'https://api.landmarkcloud.io/document/ddc74205-10d4-43f2-83ec-ef055945f732'
+        '401':
+          $ref: '#/components/responses/Unauthorized'   
+        '404':
+          $ref: '#/components/responses/NotFound' 
+  
+components:
+  responses:
+    # Default 200
+    Default:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              info:
+                $ref: '#/components/schemas/OperationInformation'
+          examples:
+            Success:
+              value: 
+                info:
+                  operationId: c8bfe090-dad7-4e87-854d-6a8eb5cfc752
+    # Not Found
+    NotFound:
+      description: The specified resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            Endpoint does not Exist:
+              value: 
+                info:
+                  operationId: c8bfe090-dad7-4e87-854d-6a8eb5cfc752
+                  messages: 
+                    - code: 40401
+                      message: The specified endpoint does not exist
+            Order Does not Exist:
+              value: 
+                info:
+                  operationId: c8bfe090-dad7-4e87-854d-6a8eb5cfc752
+                  messages: 
+                    - code: 40402
+                      message: The order with id {orderId} does not exist
+
+    #Unauthorized
+    Unauthorized:
+      description: Access token is missing/invalid or user is not authorized to access this resource
+      content:
+        application/json:
+          schema:
+              $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            Missing / Invalid Access Token:
+              value: 
+                info:
+                  operationId: c8bfe090-dad7-4e87-854d-6a8eb5cfc752
+                  messages: 
+                    - code: 40101
+                      message: Access token is missing/invalid
+            User Not Authorized:
+              value: 
+                info:
+                  operationId: c8bfe090-dad7-4e87-854d-6a8eb5cfc752
+                  messages: 
+                    - code: 40102
+                      message: User is not authorized to access this resource
+
+    #ValidationErrorResponse
+    ValidationErrorResponse:
+      description: There was an error validating your request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            Schema Validation Error:
+              $ref: '#/components/examples/SchemaValidationError'
+    
+    #OrderStatusResponse
+    OrderStatusResponse:
+      description: the status information about the order only
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OrderStatusResponse'
+          examples:
+            Order Status Example:
+              $ref: '#/components/examples/OrderStatusResponseExample'
+            Order Status Errored Example:
+              $ref: '#/components/examples/OrderStatusErrorResponseExample'
+
+
+  schemas:
+
+    #OrderStatus
+    OrderStatus:
+      type: string
+      enum:
+        - Created
+        - Processing
+        - Complete
+        - Errored
+        
+    #OrderStatusResponse
+    OrderStatusResponse:
+      type: object
+      properties:
+        info:
+          $ref: '#/components/schemas/OperationInformation'
+        data:
+          type: object
+          properties:
+            orderId: 
+              type: string
+            status:
+              $ref: '#/components/schemas/OrderStatus'
+    
+    #ErrorResponse
+    ErrorResponse:
+      type: object
+      properties:
+        info:
+          $ref: '#/components/schemas/OperationInformation'
+
+    #Address
+    Address:
+      type: object
+      properties:
+        uprn: 
+          type: string
+          minLength: 1
+          maxLength: 12
+          pattern: '^[0-9]*$'
+        organisation: 
+          type: string
+        department: 
+          type: string
+        subBuildingName: 
+          type: string
+        buildingName: 
+          type: string
+        buildingNumber:
+          type: string
+        thoroughfare: 
+          type: string
+        dependentThoroughfare:  
+          type: string
+        dependentLocality: 
+          type: string
+        postTown: 
+          type: string
+        postcode: 
+          type: string
+          pattern: '/^[a-z]{1,2}\d[a-z\d]?\s*\d[a-z]{2}$/i'
+        country:
+          type: string
+
+    #Callback
+    Callback:
+      type: object
+      required:
+        - callbackUrl
+      properties:
+        callbackUrl:
+          type: string
+        authentication:
+          type: object
+          properties:
+            authenticationMethod: 
+              type: string
+              enum:
+                - None
+                - OAuth2
+                - Other
+            tokenEndpoint:
+              type: string
+              format: url
+            data:
+              type: string
+            authenticationRequestHeaders:
+              type: array
+              items:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  value:
+                    type: string
+        callbackHeaders:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+
+    #UpdateCallback
+    UpdateCallback:
+      type: object
+      properties:
+        accountId: 
+          type: string
+        callback:
+          $ref: '#/components/schemas/Callback'
+
+    #Geometry
+    Geometry:
+      type: object
+      required:
+        - type
+        - geometry
+      properties:
+        type:
+          type: string
+        geometry:
+          type: string
+
+    #Product
+    Product:
+      type: object
+      required:
+        - productId
+      properties:
+        productId:
+          type: string
+        linkedEntity:
+          type: string
+        productOptions:
+          type: object
+          description: These options are product specific and can be queried on the Product Service
+
+    #AlternativeDelivery
+    AlternativeDelivery:
+      type: object
+      properties:
+        alternativeDeliveryMethod:
+          type: string
+          enum:
+            - EMAIL
+        alternativeEmailAddresses:
+          type: array
+          items:
+            type: string
+
+    #OrderItems
+    OrderItems:
+      type: array
+      items:
+        type: object
+        properties:
+          product:
+            $ref: '#/components/schemas/Product'
+         
+    #OrderNonPropertyRelatedRequest
+    OrderNonPropertyRelatedRequest:
+      type: object
+      description: 'Use this request type to order AML, FAS and other non-property related types of searches'
+      required:
+        - products
+        - clientRef
+        - accountId
+      properties:
+        orderItems:
+          $ref: '#/components/schemas/OrderItems'
+        clientRef:
+          type: string
+        accountId:
+          type: string
+        transactionId:
+          type: string
+        orderedFor:
+          type: string
+        callback:
+          $ref: '#/components/schemas/Callback'
+        alternativeDelivery:
+          $ref: '#/components/schemas/AlternativeDelivery'
+        
+    #OrderByAddressRequest
+    OrderByAddressRequest:
+      type: object
+      required:
+        - products
+        - clientRef
+        - accountId
+        - address
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        orderItems:
+          $ref: '#/components/schemas/OrderItems'
+        clientRef:
+          type: string
+        accountId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+        orderedFor:
+          type: string
+        callback:
+          $ref: '#/components/schemas/Callback'
+        alternativeDelivery:
+          $ref: '#/components/schemas/AlternativeDelivery'
+
+    #OrderByGeometryRequest
+    OrderByGeometryRequest:
+      type: object
+      required:
+        - products
+        - clientRef
+        - accountId
+        - geometries
+      properties:
+        geometries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Geometry'
+        address:
+          $ref: '#/components/schemas/Address'
+        orderItems:
+          $ref: '#/components/schemas/OrderItems'
+        clientRef:
+          type: string
+        accountId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+        orderedFor:
+          type: string
+        callback:
+          $ref: '#/components/schemas/Callback'
+        alternativeDelivery:
+          $ref: '#/components/schemas/AlternativeDelivery'
+    
+    #OrderByTitleNumberRequest
+    OrderByTitleNumberRequest:
+      type: object
+      required:
+        - products
+        - clientRef
+        - accountId
+        - titleNumber
+      properties:
+        titleNumber:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+        orderItems:
+          $ref: '#/components/schemas/OrderItems'
+        plan:
+          type: string
+        clientRef:
+          type: string
+        accountId:
+          type: string
+          format: uuid          
+        transactionId:
+          type: string
+          format: uuid          
+          description: UUID v4 format as supplied by the transaction service
+        orderedFor:
+          type: string
+        callback:
+          $ref: '#/components/schemas/Callback'
+        alternativeDelivery:
+          $ref: '#/components/schemas/AlternativeDelivery'
+
+    #OrderByPlanRequest
+    OrderByPlanRequest:
+      type: object
+      required:
+        - products
+        - clientRef
+        - accountId
+        - plan
+      properties:
+        titleNumber:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+        orderItems:
+          $ref: '#/components/schemas/OrderItems'
+        plan:
+          type: string
+        clientRef:
+          type: string
+        accountId:
+          type: string
+          format: uuid          
+        transactionId:
+          type: string
+          format: uuid                    
+        orderedFor:
+          type: string
+        callback:
+          $ref: '#/components/schemas/Callback'
+        alternativeDelivery:
+          $ref: '#/components/schemas/AlternativeDelivery'
+
+    #OrderLine
+    OrderLine:
+      type: object
+      properties:
+        orderItemId:
+          type: string
+        product:
+          $ref: '#/components/schemas/Product'
+        createdDate:
+          type: string
+          format: date-time
+        expectedDate:
+          type: string
+          format: date-time
+        orderItemStatus:
+          type: string
+        orderItemStatusDescription:
+          type: string
+        metaData:
+          type: object
+        price:
+          $ref: '#/components/schemas/PriceDetail'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        orderedFor:
+          type: string
+
+    #Document
+    Document:
+      type: object
+      properties:
+        documentId:
+          type: string
+        mimeType: 
+          type: string
+        documentType: 
+          type: string
+        links:
+          type: object
+          properties:
+            self: 
+              type: string
+              format: url
+            download:
+              type: string
+              format: url
+
+
+      
+    #OrderLine
+    OrderLineResponse:
+      type: object
+      properties:
+        info:
+          $ref: '#/components/schemas/OperationInformation'
+        data:
+          $ref: '#/components/schemas/OrderLine'
+
+    #PriceDetail
+    PriceDetail:
+      type: object
+      properties:
+        netPrice:
+          type: integer
+          format: int64
+        grossPrice:
+          type: integer
+          format: int64
+        vat:
+          type: integer
+          format: int64
+    
+    #OrderDetails
+    OrderDetails:
+      type: object
+      properties:
+        orderId:
+          type: string
+        transactionId:
+          type: string
+        orderStatus:
+          type: string
+        orderStatusDescription:
+          type: string
+        clientRef:
+          type: string
+        orderedFor:
+          type: string
+        orderedBy:
+          type: string
+        geometries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Geometry'
+        plan:
+          type: string
+          format: url
+        alternativeDelivery:
+          $ref: '#/components/schemas/AlternativeDelivery'
+        callback:
+          $ref: '#/components/schemas/Callback'
+        address:
+          $ref: '#/components/schemas/Address'
+        notificationType:
+          type: string
+        orderItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLine'
+        
+    #OrderDetailsResponse
+    OrderDetailsResponse:
+      type: object
+      properties:
+        info:
+          $ref: '#/components/schemas/OperationInformation'
+        data:
+          $ref: '#/components/schemas/OrderDetails'
+        
+        
+    #OperationInformation
+    OperationInformation:
+      type: object
+      required:
+        - operationId
+      properties:
+        operationId:
+          type: string
+        messages:
+          $ref: '#/components/schemas/Messages'
+
+    #Messages
+    Messages:
+      type: array
+      items:
+        type: object
+        required: 
+          - code
+          - message
+        properties:
+          code: 
+            type: string
+          property:
+            type: string
+          message:
+            type: string
+        
+
+    #OrderNotification
+    OrderNotification:
+      type: object
+      properties:
+        info:
+          $ref: '#/components/schemas/OperationInformation'
+        data:
+          type: object
+          properties:
+            notificationType:
+              type: string
+              enum:
+                - OrderFailedValidation
+                - OrderItemResult
+            clientRef:
+              type: string
+            orderId:
+              type: string
+            messages:
+              $ref: '#/components/schemas/Messages'
+            results:
+              type: array
+              items:
+                $ref: '#/components/schemas/Document'
+
+        
+
+  examples:
+
+    #OrderFailedValidationNotification
+    OrderFailedValidationNotification:
+      value:
+        info:
+          operationId: 6aa6e8d7-9684-403d-ae9f-14ca96fe1cbb
+          messages: 
+            - code: 40003
+              property: product123
+              message: 'Invalid Product Code'
+            - code: 40011
+              property: product124
+              message: "Plan doesn’t match address. The plan you supplied does not appear to match the property address 
+              for this case. Please attach a new plan showing the correct property, or amend the address of the 
+              site on this case before resubmitting."
+        data:
+          notificationType: OrderFailedValidation
+          clientRef: ABC/DEF/123.45
+          orderId: 130d6efc-c608-4d6d-a7e6-d4cbaee84f4c
+        
+    
+    #OrderItemResultNotification
+    OrderItemResultNotification:
+      value:
+        info:
+          operationId: 6aa6e8d7-9684-403d-ae9f-14ca96fe1cbb
+        data:
+          notificationType: OrderItemResult
+          clientRef: ABC/DEF/123.45
+          orderId: 130d6efc-c608-4d6d-a7e6-d4cbaee84f4c
+          orderItemId: 856c4e2c-fe53-444a-8537-a9fcb0f631cb
+          results:
+            - documentId: de457f6d-f170-48c6-bf86-dd313aca36ba
+              mimeType: application/pdf 
+              documentType: RVR
+              links:
+                self: 'https://api.landmarkcloud.io/document/de457f6d-f170-48c6-bf86-dd313aca36ba/details'
+                download: 'https://api.landmarkcloud.io/document/de457f6d-f170-48c6-bf86-dd313aca36ba'
+            
+
+    #SchemaValidationError
+    SchemaValidationError:
+      value:
+        info:
+          operationId: 6aa6e8d7-9684-403d-ae9f-14ca96fe1cbb
+          messages: 
+            - code: 40001
+              property: property1
+              message: 'property is required'
+            - code: 40001
+              property: property2
+              message: 'property2 must be a UUID v 4'
+
+    #OrderResponseExample
+    OrderResponseExample:
+      value:
+        info:
+          operationId: 6aa6e8d7-9684-403d-ae9f-14ca96fe1cbb
+        data:
+          orderId: 130d6efc-c608-4d6d-a7e6-d4cbaee84f4c
+          transactionId: 2d1a8010-7fc8-4a76-9880-09df30f56c25
+          status: Processing
+          clientRef: CLIENT/123/123/B
+          orderedFor: 68bc8ce1-c7bd-4260-bd8d-9d665655f65b
+          geometries: 
+          - type: property,
+            geometry: POLYGON((576906.35 157032.45,576907.2 157031.6,576907.4 157030.85,576906.35 157032.45))
+          address:
+            uprn: 10013040688
+            organisationName: Landmark Information Group Ltd
+            subBuildingName: Unit 5-8
+            buildingName: Abbey Court
+            thoroughfare: Eagle Way
+            dependentLocality: Sowton Industrial Estate
+            postTown: EXETER
+            postcode: EX2 7HY
+            country: E
+          orderItems:
+            - orderItemId: 856c4e2c-fe53-444a-8537-a9fcb0f631cb
+              createdDate: '2020-01-31T12:00:00Z'
+              orderItemStatus: Processing
+              orderItemStatusDescription: Order Item is being processed
+              product:
+                productId: LMKRVR
+            - orderItemId: 8a6e3b50-df03-4e0d-80d2-19a9f4763961
+              createdDate: '2020-01-31T12:00Z:00Z'
+              orderItemStatus: Processing
+              orderItemStatusDescription: Order Item is being processed
+              product:
+                productId: CON29
+
+    #OrderRequestWithAddress
+    OrderRequestWithAddress:
+      value:
+        accountId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        clientRef: ABC/DEF/123.45
+        orderItems:
+          - product:
+              productId: LMKRVR
+        address: 
+          uprn: 10013040688
+          organisationName: Landmark Information Group Ltd
+          subBuildingName: Unit 5-8
+          buildingName: Abbey Court
+          thoroughfare: Eagle Way
+          dependentLocality: Sowton Industrial Estate
+          postTown: EXETER
+          postcode: EX2 7HY
+          country: E
+        transactionId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        orderedFor: dfd680de-a1a0-49ac-8284-d89a0093ba94
+
+    #OrderRequestWithGeometries
+    OrderRequestWithGeometries:
+      value:
+        accountId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        clientRef: CLIENT/123/123/B
+        orderItems:
+          - product:
+              productId: LMKRVR
+          - product:
+              productId: CON29
+        geometries: 
+          - type: property,
+            geometry: POLYGON((576906.35 157032.45,576907.2 157031.6,576907.4 157030.85,576906.35 157032.45))
+        address: 
+          uprn: 10013040688
+          organisationName: Landmark Information Group Ltd
+          subBuildingName: Unit 5-8
+          buildingName: Abbey Court
+          thoroughfare: Eagle Way
+          dependentLocality: Sowton Industrial Estate
+          postTown: EXETER
+          postcode: EX2 7HY
+          country: E
+        transactionId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        orderedFor: dfd680de-a1a0-49ac-8284-d89a0093ba94
+        callback:
+          callbackUrl: <CALLBACK_URL>
+          authentication:
+            authenticationMethod: None
+
+
+    #OrderRequestWithGeometriesTrans
+    OrderRequestWithGeometriesTrans:
+      value:
+        transactionId: 1c7ffa26-c7b8-4884-ac12-13b180bd1c6a
+        accountId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        clientRef: ABC/DEF/123.45
+        products: 
+          - productId: LMKRVR
+        geometries: 
+          - type: property,
+            geometry: POLYGON((576906.35 157032.45,576907.2 157031.6,576907.4 157030.85,576906.35 157032.45))
+        address: 
+          uprn: 10013040688
+          organisationName: Landmark Information Group Ltd
+          subBuildingName: Unit 5-8
+          buildingName: Abbey Court
+          thoroughfare: Eagle Way
+          dependentLocality: Sowton Industrial Estate
+          postTown: EXETER
+          postcode: EX2 7HY
+          country: E
+        callback:
+          callbackUrl: <CALLBACK_URL>
+          authentication:
+            authenticationMethod: Other
+          callbackHeaders:
+            - key: Authorization
+              value: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
+
+    #OrderRequestWithTitleNumber
+    OrderRequestWithTitleNumber:
+      value:
+        accountId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        clientRef: ABC/DEF/123.45
+        titleNumber: BGL24044
+        orderItems:
+          - product:
+              productId: LMKSiteSolutions
+        address: 
+          uprn: 10013040688
+          organisationName: Landmark Information Group Ltd
+          subBuildingName: Unit 5-8
+          buildingName: Abbey Court
+          thoroughfare: Eagle Way
+          dependentLocality: Sowton Industrial Estate
+          postTown: EXETER
+          postcode: EX2 7HY
+          country: E
+        callback:
+          callbackUrl: <CALLBACK_URL>
+          authentication:
+            authenticationMethod: Other
+          callbackHeaders:
+            - key: <API_KEY_NAME>
+              value: <API_KEY>
+
+    #OrderRequestWithTitleNumberEmailDelivery
+    OrderRequestWithTitleNumberEmailDelivery:
+      value:
+        accountId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        clientRef: ABC/DEF/123.45
+        titleNumber: BGL24044
+        orderItems:
+          - product:
+              productId: LMKSiteSolutions
+        address: 
+          uprn: 10013040688
+          organisationName: Landmark Information Group Ltd
+          subBuildingName: Unit 5-8
+          buildingName: Abbey Court
+          thoroughfare: Eagle Way
+          dependentLocality: Sowton Industrial Estate
+          postTown: EXETER
+          postcode: EX2 7HY
+          country: E
+        alternativeDelivery:
+          alternativeDeliveryMethod: EMAIL
+          alternativeEmailAddresses: 
+            - joe@bloggs.com
+    
+    #OrderRequestWithPlan
+    OrderRequestWithPlan:
+      value:
+        accountId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        clientRef: ABC/DEF/123.45
+        orderItems:
+          - product:
+              productId: LMKSiteSolutions
+        address: 
+          uprn: 10013040688
+          organisationName: Landmark Information Group Ltd
+          subBuildingName: Unit 5-8
+          buildingName: Abbey Court
+          thoroughfare: Eagle Way
+          dependentLocality: Sowton Industrial Estate
+          postTown: EXETER
+          postcode: EX2 7HY
+          country: E
+        titleNumber: BGL24044
+        plan: <base 64 encoded image>
+        transactionId: 8ed496a6-eaf0-4d2d-82f3-717e7b31781b
+        orderedFor: dfd680de-a1a0-49ac-8284-d89a0093ba94
+        callback:
+          callbackUrl: <CALLBACK_URL>
+          authentication:
+            authenticationMethod: OAuth2
+            tokenEndpoint: <Your Callback URL>
+            data: "client_id=<CLIENT_ID>
+            client_secret=<CLIENT_SECRET>
+            audience=<API Audience>
+            grant_type=<GRANT_TYPE>
+            "
+            tokenIdentifier: access_token
+            authenticationRequestHeaders:
+              - key: content-type
+                value: application/x-www-form-urlencoded
+          callbackHeaders:
+            - key: <HEADER_NAME>
+              value: <HEADER_VALUE>
+    
+    #AddOrderLineRequest
+    AddOrderLineRequest:
+      value:
+        product:
+          productId: LMKRVR
+    
+    #AddOrderLineResponse
+    AddOrderLineResponse:
+      value:
+        info:
+          operationId: 6aa6e8d7-9684-403d-ae9f-14ca96fe1cbb
+        data:
+          orderItemId: 856c4e2c-fe53-444a-8537-a9fcb0f631cb
+          product:
+            productId: LMKRVR
+          createdDate: '2020-01-31T12:00:00Z'
+          orderItemStatus: Processing
+          orderItemStatusDescription: Order Item is being processed
+    
+    #AdminCallbackOAuth2
+    AdminCallbackOAuth2:
+      value:
+        accountId: 90735b87-79c5-4232-8839-1afb0d6dbfa7
+        callback:
+          callbackUrl: <CALLBACK_URL>
+          authentication:
+            authenticationMethod: OAuth2
+            tokenEndpoint: <Your Callback URL>
+            data: "client_id=<CLIENT_ID>
+            client_secret=<CLIENT_SECRET>
+            audience=<API Audience>
+            grant_type=<GRANT_TYPE>
+            "
+            tokenIdentifier: access_token
+            authenticationRequestHeaders:
+              - key: content-type
+                value: application/x-www-form-urlencoded
+          callbackHeaders:
+            - key: <HEADER_NAME>
+              value: <HEADER_VALUE>
+    
+    #AdminCallbackAPIKey
+    AdminCallbackAPIKey:
+      value:
+        accountId: 90735b87-79c5-4232-8839-1afb0d6dbfa7
+        callback:
+          callbackUrl: <CALLBACK_URL>
+          authentication:
+            authenticationMethod: Other
+          callbackHeaders:
+            - key: <API_KEY_NAME>
+              value: <API_KEY>
+
+    #AdminCallbackBasicAuth
+    AdminCallbackBasicAuth:
+      value:
+        accountId: 90735b87-79c5-4232-8839-1afb0d6dbfa7
+        callback:
+          callbackUrl: <CALLBACK_URL>
+          authentication:
+            authenticationMethod: Other
+          callbackHeaders:
+            - key: Authorization
+              value: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
+    
+    #AdminCallbackOther
+    AdminCallbackOther:
+      value:
+        accountId: 90735b87-79c5-4232-8839-1afb0d6dbfa7
+        callback:
+          callbackUrl: <CALLBACK_URL>
+          authentication:
+            authenticationMethod: None
+
+    #OrderStatusResponseExample
+    OrderStatusResponseExample:
+      value:
+        info:
+          operationId: c8bfe090-dad7-4e87-854d-6a8eb5cfc752
+        data:
+          orderId: 130d6efc-c608-4d6d-a7e6-d4cbaee84f4c
+          orderStatus: Processing
+          orderStatusDescription: Your Order is being processed
+
+    #OrderStatusErrorResponseExample
+    OrderStatusErrorResponseExample:
+      value:
+        info:
+          operationId: c8bfe090-dad7-4e87-854d-6a8eb5cfc752
+        data:
+          orderId: 130d6efc-c608-4d6d-a7e6-d4cbaee84f4c
+          orderStatus: Error
+          orderStatusDescription: There has been an error with your order.
+
+  securitySchemes:
+    bearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerToken: []

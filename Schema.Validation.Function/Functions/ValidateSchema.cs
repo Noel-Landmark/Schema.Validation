@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -27,13 +28,13 @@ namespace Schema.Validation.Functions.Functions
         {
             _logger.LogInformation("C# HTTP trigger function processed a request.");
 
-            var validSchema = false;
+            var validSchema = new List<string>();
 
             try
             {
                 var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
 
-                validSchema = _schemaService.IsValidSchema(requestBody);
+                validSchema = _schemaService.IsValidSchema(requestBody) as List<string>;
             }
             catch (Exception e)
             {

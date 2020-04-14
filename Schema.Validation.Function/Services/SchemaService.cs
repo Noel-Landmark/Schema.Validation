@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -18,7 +17,7 @@ namespace Schema.Validation.Functions.Services
 {
     public interface ISchemaService
     {
-        bool IsValidSchema(string request);
+        IList<string> IsValidSchema(string request);
     }
 
     public class SchemaService : ISchemaService
@@ -28,7 +27,6 @@ namespace Schema.Validation.Functions.Services
         private readonly IAppSettings _appSettings;
         private readonly ILogger _logger;
        
-        private readonly JEnumerable<JToken> _orderServiceSchemasListEnumerable;
         private readonly string _orderServiceSchemas;
 
         public SchemaService(IAppSettings appSettings, ILoggerFactory loggerFactory)
@@ -41,11 +39,11 @@ namespace Schema.Validation.Functions.Services
 
             _cloudBlobContainer = cloudBlobClient.GetContainerReference(_appSettings.BlobStorageContainerName);
 
-            _orderServiceSchemasListEnumerable = ExtractSchemasListFromOpenApiSpecificationAsync().Result;
-            _orderServiceSchemas = ExtractSchemasFromOpenApiSpecificationAsync().Result;
+            // Change $ref to refer to root 'properties'
+            _orderServiceSchemas = ExtractSchemasFromOpenApiSpecificationAsync().Result.Replace("components/schemas", "properties");
         }
 
-        public bool IsValidSchema(string request)
+        public IList<string> IsValidSchema(string request)
         {
             _logger.LogInformation("Start validating request.");
 
@@ -57,35 +55,34 @@ namespace Schema.Validation.Functions.Services
 
                 var requestJToken = JToken.Parse(request);
 
+                // JSON Schema properties are case sensitive
                 var isValid = requestJToken.IsValid(jSchema, out IList<string> errorMessages);
 
                 if (isValid)
                 {
-                    return true;
+                    return new List<string> { "Ok" };
                 }
 
                 _logger.LogError("Request failed validation", errorMessages);
+
+                return errorMessages;
             }
             catch (Exception e)
             {
                 _logger.LogCritical(e, e.Message);
             }
 
-            return false;
-        }
-
-        private async Task<JEnumerable<JToken>> ExtractSchemasListFromOpenApiSpecificationAsync()
-        {
-            var openApiJson = await GetOpenApiSpecificationFromBlobStorageAsync();
-
-            return openApiJson.SelectToken("components.schemas").Children();
+            return new List<string>();
         }
 
         private async Task<string> ExtractSchemasFromOpenApiSpecificationAsync()
         {
             var openApiJson = await GetOpenApiSpecificationFromBlobStorageAsync();
 
-            return openApiJson.SelectToken("components.schemas").ToString();
+            // Needs to be called properties not schema
+            var properties = new JProperty("properties") { Value = openApiJson.SelectToken("components.schemas") };
+
+            return $"{{\r\n { properties } \r\n}}";
         }
 
         private async Task<JObject> GetOpenApiSpecificationFromBlobStorageAsync()
